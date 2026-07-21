@@ -10,6 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const defaultReadyDir = path.join(__dirname, 'ready')
 const defaultDoneDir = path.join(__dirname, 'done')
 const defaultFailedDir = path.join(__dirname, 'failed')
+const defaultLogsDir = path.join(__dirname, 'logs')
 const defaultTriggerPath = path.join(process.env.HOME, '.codex/skills/loop-2-trigger/loop-2-trigger.sh')
 const staleThresholdMs = 2 * 60 * 60 * 1000
 
@@ -17,9 +18,15 @@ function log(message) {
   console.log(`[${new Date().toISOString()}] [loop2] ${message}`)
 }
 
-function ensureRuntimeDirs({ doneDir = defaultDoneDir, failedDir = defaultFailedDir } = {}) {
+function ensureRuntimeDirs({ doneDir = defaultDoneDir, failedDir = defaultFailedDir, logsDir = defaultLogsDir } = {}) {
   fs.mkdirSync(doneDir, { recursive: true })
   fs.mkdirSync(failedDir, { recursive: true })
+  fs.mkdirSync(logsDir, { recursive: true })
+}
+
+function triggerLogFile(logsDir = defaultLogsDir) {
+  const date = new Date().toISOString().slice(0, 10)
+  return path.join(logsDir, `${date}-loop2.log`)
 }
 
 export function isLockActive({ readyDir = defaultReadyDir, ticket, now = Date.now() }) {
@@ -48,13 +55,16 @@ export function findPendingTickets({ readyDir = defaultReadyDir } = {}) {
 export function spawnTrigger({
   ticket,
   triggerPath = defaultTriggerPath,
+  logsDir = defaultLogsDir,
   spawnImpl = spawn,
   logger = log
 }) {
   logger(`Spawning trigger for ${ticket}`)
+  const logFile = triggerLogFile(logsDir)
+  const logFd = fs.openSync(logFile, 'a')
   const child = spawnImpl('bash', [triggerPath, ticket], {
     detached: true,
-    stdio: 'ignore'
+    stdio: ['ignore', logFd, logFd]
   })
 
   if (typeof child.on === 'function') {
@@ -64,6 +74,8 @@ export function spawnTrigger({
   if (typeof child.unref === 'function') {
     child.unref()
   }
+
+  fs.closeSync(logFd)
 }
 
 export function poll({
