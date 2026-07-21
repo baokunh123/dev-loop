@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "once": "node server.js --once",
+    "dry-run": "node server.js --dry-run",
+    "test": "node --test"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
