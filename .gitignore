@@ -5,3 +5,9 @@ clarified/*
 !clarified/.gitkeep
 ready/*
 !ready/.gitkeep
+done/*
+!done/.gitkeep
+failed/*
+!failed/.gitkeep
+logs/*
+!logs/.gitkeep
