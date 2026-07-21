@@ -6,9 +6,13 @@ BASE="$HOME/workspace/dev-loop"
 READY="$BASE/ready/$TICKET"
 PLAN="$READY/plan.md"
 LOCKFILE="$BASE/ready/$TICKET.lock"
+MORTGAGE_ROOT="$HOME/workspace/mortgage"
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 SESSION="${NOW//[^0-9]/}"
 SESSION="${SESSION: -8}"
+RUN_ID=$(date -u +%Y%m%dt%H%M%S)
+NODE_BIN="${NODE_BIN:-/Users/bhuang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node}"
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [loop2] [$TICKET] $*"; }
 
@@ -50,11 +54,18 @@ fi
 printf '{"session":"%s","acquired":"%s"}\n' "$SESSION" "$NOW" > "$LOCKFILE"
 log "Lockfile acquired"
 
+WORKTREE=$("$NODE_BIN" --input-type=module -e "import { buildWorktreePath } from 'file://$SCRIPT_DIR/worktree.js'; console.log(buildWorktreePath({ ticket: process.argv[1], runId: process.argv[2] }))" "$TICKET" "$RUN_ID")
+BRANCH_NAME="${TICKET,,}-${RUN_ID}"
+
+git -C "$MORTGAGE_ROOT" fetch origin master
+git -C "$MORTGAGE_ROOT" worktree add -b "$BRANCH_NAME" "$WORKTREE" origin/master
+log "Worktree created: $WORKTREE"
+
 CODEX_PROMPT="Read ~/workspace/dev-loop/ready/$TICKET/plan.md.
 Use superpowers:subagent-driven-development to implement all tasks.
 When complete, run superpowers:verification-before-completion.
 Then run superpowers:finishing-a-development-branch.
-Work in ~/workspace/mortgage-graphify.
+Work in $WORKTREE.
 When done, write ~/workspace/dev-loop/ready/$TICKET/result.json:
 - On success: {\"status\": \"success\", \"pr_url\": \"<url>\"}
 - On failure: {\"status\": \"failed\", \"reason\": \"<reason>\"}"

@@ -10,16 +10,18 @@ This is the repo backup of the Codex Loop 2 trigger skill.
 
 ## Precondition
 
-- Use this only for mortgage work.
-- Run it from a Codex session with access to `~/workspace/mortgage-graphify`.
+- Use this only for `/Users/bhuang/workspace/mortgage`.
+- The trigger always creates a fresh main worktree per ticket run before invoking Codex.
+- If later subtask worktrees are needed, they branch from that isolated ticket-run workspace rather than from a shared root.
 
 ## What `loop-2-trigger.sh` does
 
 1. Acquires a lockfile (`ready/<ticket>.lock`, 2-hour stale threshold)
-2. Runs `codex exec --approval-mode full-auto` with the prompt below
-3. Reads `ready/<ticket>/result.json` written by Codex
-4. Success -> moves ticket to `done/<ticket>/`
-5. Failure -> retries once; second failure -> moves to `failed/<ticket>/` with `error.md`
+2. Creates a fresh mortgage worktree for this ticket run
+3. Runs `codex exec --approval-mode full-auto` with the prompt below
+4. Reads `ready/<ticket>/result.json` written by Codex
+5. Success -> moves ticket to `done/<ticket>/`
+6. Failure -> retries once; second failure -> moves to `failed/<ticket>/` with `error.md`
 
 ## Codex prompt
 
@@ -28,7 +30,7 @@ Read ~/workspace/dev-loop/ready/<ticket>/plan.md.
 Use superpowers:subagent-driven-development to implement all tasks.
 When complete, run superpowers:verification-before-completion.
 Then run superpowers:finishing-a-development-branch.
-Work in ~/workspace/mortgage-graphify.
+Work in <fresh mortgage worktree path>.
 When done, write ~/workspace/dev-loop/ready/<ticket>/result.json:
 - On success: {"status": "success", "pr_url": "<url>"}
 - On failure: {"status": "failed", "reason": "<reason>"}
