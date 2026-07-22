@@ -54,6 +54,21 @@ Save output to:
 
 Delete `~/workspace/dev-loop/clarified/<ticket>.lock`.
 
-## Step 8: Done
+## Step 8: Present plan and wait for approval
 
-The ticket folder `clarified/<ticket>/` now contains `plan.md` and `plan.zh.md`. A human can review it and move it to `ready/<ticket>/` for Loop 2.
+Show the contents of `clarified/<ticket>/plan.zh.md` to the user and ask:
+
+> "以上是 <ticket> 的实施计划。是否批准？(yes/no)"
+
+- User answers **no** → tell the user they can edit `clarified/<ticket>/plan.md` manually and re-trigger. Stop here.
+- User answers **yes** → run Step 9.
+
+## Step 9: Approve and move to ready/
+
+Run:
+
+```bash
+bash ~/workspace/dev-loop/scripts/approve.sh <ticket>
+```
+
+This script writes the audit events (`triage_started`, `plan_written`, `plan_approved`) with correct timestamps and session ID from the lockfile, then copies the folder to `ready/<ticket>/`.

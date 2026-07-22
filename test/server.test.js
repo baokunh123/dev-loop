@@ -57,7 +57,8 @@ test('dry run logs writes but does not write files or update processed state', a
     clarifiedDir,
     processedFile,
     fetchTicketsImpl: async () => [makeIssue()],
-    logger: (message) => logs.push(message)
+    logger: (message) => logs.push(message),
+    auditImpl: () => {}
   })
 
   assert.deepEqual(fs.readdirSync(clarifiedDir), [])
@@ -77,7 +78,8 @@ test('normal poll writes files and updates processed state', async () => {
     clarifiedDir,
     processedFile,
     fetchTicketsImpl: async () => [makeIssue()],
-    logger: () => {}
+    logger: () => {},
+    auditImpl: () => {}
   })
 
   assert.ok(fs.existsSync(path.join(clarifiedDir, 'FPP-2245.md')))

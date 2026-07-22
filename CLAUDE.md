@@ -11,6 +11,8 @@ npm run once         # run loop1 poll once and exit
 npm run dry-run      # dry-run loop1 poll (logs but writes nothing)
 npm test             # run all tests (node --test, no framework)
 node --test test/server.test.js  # run a single test file
+npm run audit-log    # print lifecycle summary table from audit logs
+bash scripts/approve.sh <TICKET>  # approve a ticket: write audit events + cp to ready/
 ```
 
 ## Architecture
@@ -43,6 +45,7 @@ Two independent polling loops run on the same cron schedule (`0 9-17 * * 1-5` PS
 - Tests use Node's built-in `node:test` + `node:assert/strict` — no test framework
 - `processed.json`, `clarified/`, `ready/`, `done/`, `failed/` are gitignored runtime state
 - `skills/` is the repo copy of skill files; `.claude/skills/` is where Claude Code actually reads them. Keep both in sync when editing skills.
+- Audit log: `logs/audit-YYYY-MM-DD.jsonl`, one JSONL line per event: `{ts, event, ticket, session_type, session_id, ...}`. Events: `jira_poll_start`, `ticket_written` (server.js), `triage_started`/`plan_written`/`plan_approved` (approve.sh from lockfile), `dispatch_sent` (loop-2-trigger.sh), `worker_result` (loop-2-scan.js on next scan after result.json appears). The `.result_audited` marker file prevents double-writing `worker_result`.
 
 ## Environment
 

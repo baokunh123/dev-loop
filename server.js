@@ -1,9 +1,11 @@
 import fs from 'fs'
 import path from 'path'
+import crypto from 'node:crypto'
 import cron from 'node-cron'
 import process from 'node:process'
 import { fileURLToPath } from 'url'
 import 'dotenv/config'
+import { writeAuditEvent } from './lib/audit.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const defaultProcessedFile = path.join(__dirname, 'processed.json')
@@ -121,9 +123,12 @@ export async function poll({
   processedFile = defaultProcessedFile,
   clarifiedDir = defaultClarifiedDir,
   fetchTicketsImpl = fetchTickets,
-  logger = log
+  logger = log,
+  auditImpl = writeAuditEvent
 } = {}) {
+  const sessionId = crypto.randomBytes(4).toString('hex')
   logger(`Poll start${dryRun ? ' (dry run)' : ''}`)
+  auditImpl({ event: 'jira_poll_start', ticket: null, sessionType: 'claude', sessionId })
 
   let issues
   try {
@@ -150,6 +155,7 @@ export async function poll({
 
     writeTicket(clarifiedDir, issue, logger)
     markProcessed(processedFile, dedupeKey)
+    auditImpl({ event: 'ticket_written', ticket: issue.key, sessionType: 'claude', sessionId })
   }
 
   logger('Poll end')

@@ -23,7 +23,7 @@ test('scanReadyTickets returns at most 3 unlocked tickets in sorted order', () =
     readyDir,
     maxParallel: 3,
     isLockActiveImpl: ({ ticket }) => ticket === 'FPP-1002',
-    logger: () => {}
+    auditImpl: () => {}
   })
 
   assert.deepEqual(result, {

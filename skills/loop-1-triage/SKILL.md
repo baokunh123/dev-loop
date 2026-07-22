@@ -1,73 +1,74 @@
 ---
 name: loop-1-triage
-description: Jira fetch + 扫描 clarified/ 中未处理的 ticket + 运行 brainstorming 产出计划
+description: Scan clarified/ for unprocessed Jira tickets and run brainstorming to produce plans
 user_invocable: false
 ---
 
-# Loop 1 Skill
+# Loop 1 Triage Skill
 
-你是 Loop 1 agent。本 skill 通过 CronCreate 调度（`0 9-17 * * 1-5` PST）运行。
+You are the Loop 1 triage agent. Run this skill on a CronCreate schedule (`0 9-17 * * 1-5` PST).
 
-**前置条件：** 本 skill 必须在 `~/workspace/mortgage-graphify` 目录的 Claude Code session 中运行，以获取项目 CLAUDE.md 和编码规范的 context。
+## Step 1: Scan for pending tickets
 
-## 步骤 1：运行 bash 脚本
+Look in `~/workspace/dev-loop/clarified/` for files matching `*.md` at the top level that do not have a corresponding `~/workspace/dev-loop/clarified/<ticket>/plan.md`.
 
-```bash
-bash ~/.claude/skills/loop-1-triage/loop-1.sh
-```
+Example: `FPP-1234.md` exists but `clarified/FPP-1234/plan.md` does not, so it is pending.
 
-脚本会：
-1. 获取全局 poll.lock（防多 session 并发）
-2. 调用 Jira API，写 `clarified/<TICKET>.md` + 更新 `processed.json`
-3. 释放 poll.lock
-4. 选取下一个无 `plan.md` 的 ticket，获取 per-ticket lock
+If no pending tickets are found, exit silently. Do not log anything.
 
-- 输出为空 → 无待处理 ticket，静默退出。
-- 输出 `TICKET=FPP-1234` 和 `CONTENT_FILE=...` → 继续下一步。
+## Step 2: Pick one ticket
 
-## 步骤 2：读取 ticket 内容
+Select the ticket with the lowest number, for example `FPP-1234` before `FPP-1235`.
 
-读取 `CONTENT_FILE` 的完整内容。
+## Step 3: Acquire lockfile
 
-## 步骤 3：运行 brainstorming
+Check for `~/workspace/dev-loop/clarified/<ticket>.lock`.
 
-调用 `superpowers:brainstorming`，注入以下初始 context：
+- If it is not present, write:
+  `{"session":"<random 8-char hex>","acquired":"<ISO timestamp>"}`
+- If it is present and newer than 2 hours, another session owns it. Exit silently.
+- If it is present and 2 hours old or older, treat it as stale, overwrite it, and continue.
 
-> "这是 mortgage-graphify monorepo 的一个 Jira ticket。Ticket 内容：[完整 ticket 内容]"
+## Step 4: Read ticket content
 
-brainstorming 是交互式的——skill 启动后由用户接管对话，回答问题，直到需求澄清完毕。
+Read `~/workspace/dev-loop/clarified/<ticket>.md` in full.
 
-## 步骤 4：保存 spec
+## Step 5: Run brainstorming
 
-brainstorming 完成后，将 spec 保存到：
-- `~/workspace/dev-loop/clarified/<ticket>/spec.md`（英文）
-- `~/workspace/dev-loop/clarified/<ticket>/spec.zh.md`（中文）
+Invoke `superpowers:brainstorming` with the ticket content as context.
 
-## 步骤 5：运行 writing-plans
+Pass this context:
 
-调用 `superpowers:writing-plans`，基于 spec 编写实施计划，保存到：
-- `~/workspace/dev-loop/clarified/<ticket>/plan.md`（英文）
-- `~/workspace/dev-loop/clarified/<ticket>/plan.zh.md`（中文）
+> This is a Jira ticket for the dev-loop repo. Please run brainstorming to clarify requirements and produce an implementation plan. Ticket content: [paste full ticket content]
 
-## 步骤 6：释放 lockfile
+## Step 6: Run writing-plans
 
-```bash
-rm ~/workspace/dev-loop/clarified/<ticket>.lock
-```
+After brainstorming completes, invoke `superpowers:writing-plans` to write the plan.
 
-## 步骤 7：等待用户审阅
+Save output to:
 
-展示 `plan.zh.md` 的内容，询问用户是否批准：
+- `~/workspace/dev-loop/clarified/<ticket>/plan.md`
+- `~/workspace/dev-loop/clarified/<ticket>/plan.zh.md`
+
+## Step 7: Release lockfile
+
+Delete `~/workspace/dev-loop/clarified/<ticket>.lock`.
+
+## Step 8: Present plan and wait for approval
+
+Show the contents of `clarified/<ticket>/plan.zh.md` to the user and ask:
 
 > "以上是 <ticket> 的实施计划。是否批准？(yes/no)"
 
-- 用户回答 **yes** → 继续步骤 8
-- 用户回答 **no** → 告知用户可手动修改 `clarified/<ticket>/plan.md` 后重新触发，结束。
+- User answers **no** → tell the user they can edit `clarified/<ticket>/plan.md` manually and re-trigger. Stop here.
+- User answers **yes** → run Step 9.
 
-## 步骤 8：移入 ready/
+## Step 9: Approve and move to ready/
+
+Run:
 
 ```bash
-cp -r ~/workspace/dev-loop/clarified/<ticket> ~/workspace/dev-loop/ready/<ticket>
+bash ~/workspace/dev-loop/scripts/approve.sh <ticket>
 ```
 
-ticket 已进入 Loop 2 队列。
+This script writes the audit events (`triage_started`, `plan_written`, `plan_approved`) with correct timestamps and session ID from the lockfile, then copies the folder to `ready/<ticket>/`.

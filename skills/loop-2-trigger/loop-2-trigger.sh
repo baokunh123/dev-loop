@@ -52,4 +52,8 @@ fi
 
 printf '{"session":"%s","acquired":"%s"}\n' "$SESSION" "$NOW" > "$LOCKFILE"
 log "Lockfile acquired"
+"$NODE_BIN" --input-type=module -e "
+import { writeAuditEvent } from 'file://$BASE/lib/audit.js'
+writeAuditEvent({ event: 'dispatch_sent', ticket: '$TICKET', sessionType: 'codex', sessionId: '$SESSION' })
+" || true
 "$NODE_BIN" --input-type=module -e "import { buildDispatchPayload } from 'file://$SCRIPT_DIR/dispatch.js'; console.log(JSON.stringify({ status: 'dispatch_ready', ...buildDispatchPayload({ ticket: process.argv[1], baseDir: process.argv[2] }) }))" "$TICKET" "$BASE"

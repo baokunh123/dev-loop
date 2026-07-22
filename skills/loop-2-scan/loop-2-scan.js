@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import process from 'node:process'
+import { writeAuditEvent } from '../../lib/audit.js'
 
 const defaultBaseDir = path.resolve(process.cwd())
 const defaultReadyDir = path.join(defaultBaseDir, 'ready')
@@ -26,11 +27,34 @@ export function findReadyTickets({ readyDir = defaultReadyDir } = {}) {
     .sort()
 }
 
+export function auditWorkerResults({ readyDir = defaultReadyDir, auditImpl = writeAuditEvent } = {}) {
+  const tickets = findReadyTickets({ readyDir })
+  for (const ticket of tickets) {
+    const resultFile = path.join(readyDir, ticket, 'result.json')
+    const auditMarker = path.join(readyDir, ticket, '.result_audited')
+    if (!fs.existsSync(resultFile) || fs.existsSync(auditMarker)) continue
+
+    try {
+      const result = JSON.parse(fs.readFileSync(resultFile, 'utf8'))
+      const lockFile = path.join(readyDir, `${ticket}.lock`)
+      const sessionId = fs.existsSync(lockFile)
+        ? JSON.parse(fs.readFileSync(lockFile, 'utf8')).session ?? ''
+        : ''
+      auditImpl({ event: 'worker_result', ticket, sessionType: 'codex', sessionId, status: result.status, pr_url: result.pr_url ?? null })
+      fs.writeFileSync(auditMarker, '')
+    } catch {
+      // malformed result.json — skip, will retry next scan
+    }
+  }
+}
+
 export function scanReadyTickets({
   readyDir = defaultReadyDir,
   maxParallel = 3,
-  isLockActiveImpl = isLockActive
+  isLockActiveImpl = isLockActive,
+  auditImpl = writeAuditEvent
 } = {}) {
+  auditWorkerResults({ readyDir, auditImpl })
   const tickets = findReadyTickets({ readyDir })
   return {
     tickets: tickets

@@ -6,7 +6,8 @@
     "start": "node server.js",
     "once": "node server.js --once",
     "dry-run": "node server.js --dry-run",
-    "test": "node --test"
+    "test": "node --test",
+    "audit-log": "bash scripts/audit-summary.sh"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
