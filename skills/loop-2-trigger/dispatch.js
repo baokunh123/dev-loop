@@ -8,8 +8,9 @@ You are working on /Users/bhuang/workspace/mortgage from this thread.
 Required execution flow:
 - Use superpowers:using-superpowers first.
 - Then read the implementation plan.
-- Use mortgage-new-worktree to create a fresh mortgage worktree from origin/master for this ticket.
-- Do all implementation, verification, and branch work in that new mortgage worktree, not in /Users/bhuang/workspace/mortgage.
+- For each execution unit, use mortgage-new-worktree to create a fresh mortgage worktree from origin/master with the fixed label format ticketslug-4hex, for example fpp2253-a1b2.
+- Do all implementation, verification, and branch work in that worktree, not in /Users/bhuang/workspace/mortgage.
+- If the plan needs parallel subtasks, each subtask must create and use its own separate ticketslug-4hex mortgage worktree.
 - Use superpowers:subagent-driven-development to execute the plan task by task.
 - Before any completion claim, use superpowers:verification-before-completion.
 - Then use superpowers:finishing-a-development-branch.
