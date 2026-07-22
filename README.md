@@ -1,6 +1,6 @@
 # dev-loop
 
-`dev-loop` pulls Jira tickets labeled `claude-ready` into local markdown files, then lets a scheduled Codex skill turn those clarified tickets into implementation plans.
+`dev-loop` pulls Jira tickets labeled `claude-ready` into local markdown files, then lets scheduled Codex skills turn those clarified tickets into implementation plans and dispatch approved plans into mortgage worker threads.
 
 ## What It Does
 
@@ -28,6 +28,7 @@ There are two loops in this repo:
 - `clarified/`: raw Jira tickets pulled from Jira
 - `clarified/<TICKET>/`: generated plans for a ticket
 - `ready/`: handoff area after a human approves a generated plan
+- `ready/<TICKET>.lock`: active Loop 2 dispatch lock
 - `processed.json`: dedup state for the Jira poller
 
 ## Environment
@@ -98,6 +99,14 @@ A Codex cron automation named `loop-1-triage` has been created for this repo.
 - schedule: weekdays, hourly, 9:00 through 17:00 Pacific
 - working directory: `/Users/bhuang/workspace/dev-loop`
 - purpose: run the `loop-1-triage` skill when pending clarified tickets exist
+
+Loop 2 is now intended to run from a Codex automation thread:
+
+- run `skills/loop-2-scan/loop-2-scan.sh`
+- read its JSON output
+- for each returned ticket, run `skills/loop-2-trigger/loop-2-trigger.sh <ticket>`
+- read that JSON payload
+- call `create_thread` in the mortgage project with `worktree` environment using the returned worker prompt
 
 ## Notes
 

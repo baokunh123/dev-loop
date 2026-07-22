@@ -6,15 +6,13 @@ BASE="$HOME/workspace/dev-loop"
 READY="$BASE/ready/$TICKET"
 PLAN="$READY/plan.md"
 LOCKFILE="$BASE/ready/$TICKET.lock"
-MORTGAGE_ROOT="$HOME/workspace/mortgage"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 SESSION="${NOW//[^0-9]/}"
 SESSION="${SESSION: -8}"
-RUN_ID=$(date -u +%Y%m%dt%H%M%S)
 NODE_BIN="${NODE_BIN:-/Users/bhuang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node}"
 
-log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [loop2] [$TICKET] $*"; }
+log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [loop2] [$TICKET] $*" >&2; }
 
 if [[ ! -d "$READY" ]]; then
   log "Missing ready directory: $READY"
@@ -46,6 +44,7 @@ if [[ -f "$LOCKFILE" ]]; then
   AGE_H=$(lock_age_hours)
   if [[ $AGE_H -lt 2 ]]; then
     log "Skipped - lockfile active (age: ${AGE_H}h)"
+    printf '{"status":"skipped","ticket":"%s","reason":"lock_active"}\n' "$TICKET"
     exit 0
   fi
   log "Stale lockfile detected (age: ${AGE_H}h), overwriting"
@@ -53,96 +52,4 @@ fi
 
 printf '{"session":"%s","acquired":"%s"}\n' "$SESSION" "$NOW" > "$LOCKFILE"
 log "Lockfile acquired"
-
-WORKTREE=$("$NODE_BIN" --input-type=module -e "import { buildWorktreePath } from 'file://$SCRIPT_DIR/worktree.js'; console.log(buildWorktreePath({ ticket: process.argv[1], runId: process.argv[2] }))" "$TICKET" "$RUN_ID")
-BRANCH_NAME="${TICKET,,}-${RUN_ID}"
-
-git -C "$MORTGAGE_ROOT" fetch origin master
-git -C "$MORTGAGE_ROOT" worktree add -b "$BRANCH_NAME" "$WORKTREE" origin/master
-log "Worktree created: $WORKTREE"
-
-CODEX_PROMPT="Read ~/workspace/dev-loop/ready/$TICKET/plan.md.
-Use superpowers:subagent-driven-development to implement all tasks.
-When complete, run superpowers:verification-before-completion.
-Then run superpowers:finishing-a-development-branch.
-Work in $WORKTREE.
-When done, write ~/workspace/dev-loop/ready/$TICKET/result.json:
-- On success: {\"status\": \"success\", \"pr_url\": \"<url>\"}
-- On failure: {\"status\": \"failed\", \"reason\": \"<reason>\"}"
-
-run_codex() {
-  local attempt=$1
-  log "Starting Codex attempt $attempt"
-  rm -f "$READY/result.json"
-  codex exec --approval-mode full-auto "$CODEX_PROMPT" || true
-}
-
-read_result() {
-  if [[ ! -f "$READY/result.json" ]]; then
-    echo "result.json missing"
-    return 1
-  fi
-
-  python3 - "$READY/result.json" <<'PY'
-import json
-import sys
-
-with open(sys.argv[1], "r", encoding="utf-8") as handle:
-    payload = json.load(handle)
-
-sys.exit(0 if payload.get("status") == "success" else 1)
-PY
-}
-
-read_reason() {
-  if [[ ! -f "$READY/result.json" ]]; then
-    echo "result.json missing"
-    return
-  fi
-
-  python3 - "$READY/result.json" <<'PY'
-import json
-import sys
-
-with open(sys.argv[1], "r", encoding="utf-8") as handle:
-    payload = json.load(handle)
-
-print(payload.get("reason", payload.get("pr_url", "unknown")))
-PY
-}
-
-run_codex 1
-REASON1=$(read_reason)
-if read_result; then
-  log "Attempt 1 succeeded - PR: $REASON1"
-  mv "$READY" "$BASE/done/$TICKET"
-  rm -f "$LOCKFILE"
-  log "Moved to done/"
-  exit 0
-fi
-log "Attempt 1 failed: $REASON1"
-
-run_codex 2
-REASON2=$(read_reason)
-if read_result; then
-  log "Attempt 2 succeeded - PR: $REASON2"
-  mv "$READY" "$BASE/done/$TICKET"
-  rm -f "$LOCKFILE"
-  log "Moved to done/"
-  exit 0
-fi
-log "Attempt 2 failed: $REASON2"
-
-mkdir -p "$BASE/failed/$TICKET"
-cat > "$BASE/failed/$TICKET/error.md" <<EOF
-# $TICKET - Failed after 2 attempts
-
-Attempt 1: $REASON1
-Attempt 2: $REASON2
-Timestamp: $NOW
-EOF
-mv "$READY"/* "$BASE/failed/$TICKET/" 2>/dev/null || true
-rmdir "$READY" 2>/dev/null || true
-rm -f "$LOCKFILE"
-log "Escalated to failed/"
-exit 1
+"$NODE_BIN" --input-type=module -e "import { buildDispatchPayload } from 'file://$SCRIPT_DIR/dispatch.js'; console.log(JSON.stringify({ status: 'dispatch_ready', ...buildDispatchPayload({ ticket: process.argv[1], baseDir: process.argv[2] }) }))" "$TICKET" "$BASE"
